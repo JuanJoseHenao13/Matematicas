@@ -2,6 +2,7 @@
 
 # dependencies
 /node_modules
+frontend/node_modules
 /.pnp
 .pnp.*
 .yarn/*
@@ -41,3 +42,7 @@ yarn-error.log*
 next-env.d.ts
 
 /src/generated/prisma
+
+# prisma dev databases
+/prisma/*.db
+/prisma/*.db-journal

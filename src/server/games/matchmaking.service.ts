@@ -50,4 +50,19 @@ export class MatchmakingService {
       return { status: "QUEUED", ticketId: ticket.id };
     }
   }
+
+  /**
+   * Cancela la búsqueda de partida de un usuario.
+   */
+  static async cancelMatch(userId: string) {
+    return prisma.matchmakingTicket.updateMany({
+      where: {
+        userId,
+        status: "QUEUED"
+      },
+      data: {
+        status: "CANCELLED"
+      }
+    });
+  }
 }
