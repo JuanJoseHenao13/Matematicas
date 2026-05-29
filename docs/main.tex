@@ -1,0 +1,125 @@
+% main.tex – LaTeX version for Overleaf
+% -------------------------------------------------
+% This file contains the same content as the markdown version, but fully in LaTeX
+% so Overleaf can compile it without needing the markdown+latex engine.
+
+\documentclass[12pt]{article}
+\usepackage[spanish]{babel}
+\usepackage{amsmath,amssymb}
+\usepackage{geometry}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\geometry{margin=1in}
+
+% Code listing style
+\lstset{basicstyle=\ttfamily\small,breaklines=true,backgroundcolor=\color{gray!10},frame=single}
+
+\title{Arquitectura Frontend ⇄ Backend y Modelado Físico}
+\author{Quizmate Development Team}
+\date{\today}
+
+\begin{document}
+\maketitle
+
+\section*{Resumen Ejecutivo}
+El objetivo del proyecto es ofrecer una experiencia educativa interactiva en la que el usuario lanza un proyectil (lanza, arco, etc.) y observa su trayectoria basada en principios de cinemática y trigonometría.  
+Todas las decisiones críticas (cálculo de la parábola, detección de impacto, cálculo de daño y "knockback") se realizan en el \textbf{backend} mediante un servidor Express + Prisma.  
+El frontend, construido con \textbf{React} y \textbf{Phaser}, se limita a capturar la entrada del usuario, enviarla al servidor y reproducir visualmente los datos devueltos.
+
+\section*{Stack Tecnológico}
+\begin{itemize}
+  \item \textbf{Frontend}: React 19, Vite, TypeScript, Phaser 3.
+  \item \textbf{Backend}: Node.js, Express, TypeScript, Prisma (PostgreSQL), Socket.IO.
+  \item \textbf{Comunicación}: REST (\texttt{/api/game/shoot}) + WebSockets.
+  \item \textbf{Autenticación}: JWT (Bearer token) en cabecera \texttt{Authorization}.
+\end{itemize}
+
+\section*{Flujo de Interacción}
+\begin{enumerate}
+  \item El usuario ingresa velocidad, ángulo y opcionalmente ubicación del golpe ("head" o "body").
+  \item Al pulsar "Disparar", el frontend envía una petición POST a \texttt{/api/game/shoot} con el cuerpo JSON:
+\begin{verbatim}
+{ "gameId": "<id>", "velocity": 75.5, "angleDegrees": 42, "direction": 1, "weaponId": "spear", "hitLocation": "head" }
+\end{verbatim}
+  \item El backend valida el JWT mediante \texttt{authMiddleware} y verifica que el jugador pertenezca a la partida.
+  \item Se calcula la \textbf{trayectoria parabólica} (ver sección \ref{sec:trajectory}).
+  \item Se detecta proximidad al oponente, se determina si el golpe es exitoso y se calcula daño y knockback (ver sección \ref{sec:damage}).
+  \item Se persisten los cambios en la base de datos y se registra el disparo.
+  \item El servidor emite \texttt{game\_update} vía Socket.IO para sincronizar al rival.
+  \item El frontend recibe la respuesta/evento y actualiza UI y animaciones con Phaser.
+\end{enumerate}
+
+\section{Cálculo de la Trayectoria}\label{sec:trajectory}
+El algoritmo implementado en \texttt{src/server/games/index.ts} emplea la fórmula clásica de movimiento bajo gravedad constante:
+\begin{align}
+  x(t) &= x_{0} + v\cos(\theta)\,d\,t \\
+  y(t) &= y_{0} + v\sin(\theta)\,t - \frac{1}{2}g\,t^{2} + w\,t
+\end{align}
+Donde:
+\begin{itemize}
+  \item $x_{0},y_{0}$: posición inicial del lanzador.
+  \item $v$: velocidad inicial.
+  \item $\theta$: ángulo (rad).
+  \item $d$: dirección horizontal (1 o -1).
+  \item $g$: gravedad (valor fijo $0.5$).
+  \item $w$: componente de viento horizontal (actualmente $0$, extensible).
+\end{itemize}
+El recorrido se genera iterando cada $\Delta t = 0.5\,\text{s}$ hasta que $y$ supera la altura inicial (impacto con el suelo).
+
+\section{Daño y Knockback}\label{sec:damage}
+Se calcula la distancia euclidiana entre el punto de impacto y el oponente:
+\[ d = \sqrt{(x_{impact}-x_{op})^{2} + (y_{impact}-y_{op})^{2}} \]
+Si $d < 55$ px, el disparo se considera exitoso ($\textit{isHit}=true$).
+
+\subsection*{Rangos de Daño}
+\begin{lstlisting}[language=typescript]
+let damage = 0;
+if (isHit) {
+  const hitLocation = (req.body as any).hitLocation ?? 'body';
+  if (hitLocation === 'head') {
+    damage = Math.floor(Math.random() * (30 - 22 + 1)) + 22; // 22‑30
+  } else {
+    damage = Math.floor(Math.random() * (20 - 14 + 1)) + 14; // 14‑20
+  }
+}
+\end{lstlisting}
+El knockback se calcula como:
+\[ k = d_{direction}\times \operatorname{round}(damage\times1.1) \]
+Y se aplica mediante Prisma (`positionX` incrementado).
+
+\section{Comunicación en Tiempo Real}
+\begin{lstlisting}[language=typescript]
+socketServer?.to(gameId).emit('game_update', {
+  shooterId,
+  trajectory,
+  impactPoint,
+  isHit,
+  damage,
+  knockback,
+  newTargetPositionX
+});
+\end{lstlisting}
+Cliente (React/Phaser):
+\begin{lstlisting}[language=javascript]
+socket.on('game_update', data => {
+  // Dibujar trayectoria con Phaser, aplicar daño/knockback
+});
+\end{lstlisting}
+
+\section{Renderizado en Phaser}
+\begin{lstlisting}[language=javascript]
+const graphics = this.add.graphics();
+graphics.lineStyle(2, 0xffffff);
+graphics.beginPath();
+trajectory.forEach((p,i)=>{ if(i===0) graphics.moveTo(p.x,p.y); else graphics.lineTo(p.x,p.y);});
+graphics.strokePath();
+\end{lstlisting}
+
+\section{Extensibilidad del Viento}
+Para habilitar viento, envíe el campo `wind` en la petición y modifique `calculateTrajectory` para incluir $w\,t$ en $x(t)$. No se necesita tocar la lógica de daño.
+
+\section*{Conclusiones}
+El proyecto sigue el principio de \textbf{backend autoritativo}: toda la física y lógica de juego se calculan en el servidor, mientras el cliente solo renderiza. Esta arquitectura permite añadir nuevas variables (viento, gravedad variable) con mínimos cambios en el frontend.
+
+\end{document}

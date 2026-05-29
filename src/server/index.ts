@@ -7,9 +7,9 @@ import { Server as SocketIOServer } from 'socket.io';
 import { router as authRouter } from './auth/index';
 import { router as matchmakingRouter } from './matchmaking';
 import { router as usersRouter } from './users/index';
-import { router as gamesRouter } from './games/index';
-// Add other routers as needed
+import { router as gameRouter } from './games';
 
+// Initialize app and middleware
 const app = express();
 app.use(cors());
 app.use(express.json());
@@ -18,11 +18,25 @@ app.use(express.json());
 app.use('/auth', authRouter);
 app.use('/matchmaking', matchmakingRouter);
 app.use('/users', usersRouter);
-app.use('/games', gamesRouter);
-// Add more mounts here if you have other modules
+app.use('/api/game', gameRouter);
 
+// Create HTTP server and Socket.IO instance
 const httpServer = createServer(app);
 const io = new SocketIOServer(httpServer, { cors: { origin: '*' } });
+
+export const httpServerInstance = httpServer;
+export const socketServer = io;
+
+// Socket.io connection handling
+io.on('connection', (socket) => {
+  // Client can join a specific game room
+  socket.on('joinGame', ({ gameId }) => {
+    if (gameId) {
+      socket.join(gameId);
+      console.log(`Socket ${socket.id} joined room ${gameId}`);
+    }
+  });
+});
 
 // If you have socket event handlers, import and init them here
 // import { initSockets } from './sockets';

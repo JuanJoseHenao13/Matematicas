@@ -920,20 +920,75 @@ export default class GameScene extends Phaser.Scene {
     
     const startX = wasMyTurn ? this.playerLeft.container.x + 38 : this.playerRight.container.x - 38;
     const startY = wasMyTurn ? this.playerLeft.container.y - 18 : this.playerRight.container.y - 18;
-    
-    const points = this.calculateTrajectory(startX, startY, power, angleDegrees, direction);
-
     const target = wasMyTurn ? this.playerRight : this.playerLeft;
-    const result = await this.animateProjectile(points, startX, startY, direction, target);
-    const impact = result.impact || points[points.length - 1];
-    const hit = result.hit || this.isHitTarget(impact, target);
+
+    let points, impact, hit, damageToApply, knockbackToApply, newTargetHealth;
+
+    if (this.gameId && this.gameMode !== 'cpu') {
+      // LLAMADA AL BACKEND PARA PARTIDAS MULTIJUGADOR / PVP
+      const response = await api.shoot(this.gameId, power, angleDegrees, direction, 'spear');
+      
+      if (!response.success) {
+        this.showFeedback('ERROR EN DISPARO', '#ec3131');
+        this.isAnimating = false;
+        if (this.turnTimerEvent) this.turnTimerEvent.paused = false;
+        return;
+      }
+      
+      const data = response.data;
+      
+      // Si el backend provee la trayectoria array (por README.md), invertir Y
+      if (data.trajectory && data.trajectory.length > 0) {
+        const baseY = this.scale.height - this.groundHeight;
+        points = data.trajectory.map(pt => ({
+          x: pt.x,
+          y: baseY - pt.y
+        }));
+      } else {
+        points = this.calculateTrajectory(startX, startY, power, angleDegrees, direction);
+      }
+      
+      await this.animateProjectile(points, startX, startY, direction, target);
+      
+      // Resolver impacto y daño desde backend
+      const baseY = this.scale.height - this.groundHeight;
+      if (data.impactPoint) {
+        impact = { x: data.impactPoint.x, y: baseY - data.impactPoint.y };
+      } else if (data.impactX !== undefined) {
+        impact = { x: data.impactX, y: baseY - data.impactY };
+      } else {
+        impact = points[points.length - 1];
+      }
+      
+      hit = data.isHit;
+      damageToApply = data.damage || 0;
+      knockbackToApply = data.knockback || (direction * Math.round(damageToApply * 1.1));
+      newTargetHealth = data.newTargetHealth !== undefined ? data.newTargetHealth : data.targetHealthAfterShot;
+      
+      // Mostrar info matemática si existe
+      if (data.mathAnalysis) {
+        console.log("Análisis matemático (Matemáticas 3):", data.mathAnalysis);
+        // Podríamos mostrar esto en pantalla con un texto o panel pequeño
+      }
+      
+    } else {
+      // MODO LOCAL / CPU / PRÁCTICA
+      points = this.calculateTrajectory(startX, startY, power, angleDegrees, direction);
+      const result = await this.animateProjectile(points, startX, startY, direction, target);
+      impact = result.impact || points[points.length - 1];
+      hit = result.hit || this.isHitTarget(impact, target);
+      damageToApply = Phaser.Math.Between(14, 26);
+      knockbackToApply = direction * Math.round(damageToApply * 1.1);
+    }
 
     this.createImpactEffect(impact.x, impact.y, hit);
 
     if (hit) {
-      const damage = Phaser.Math.Between(14, 26);
-      const knockback = direction * Math.round(damage * 1.1);
-      this.applyDamage(target, damage, knockback);
+      if (newTargetHealth !== undefined) {
+        // Ajustamos la vida actual del target para que applyDamage cuadre exacto al restar
+        target.health = newTargetHealth + damageToApply; 
+      }
+      this.applyDamage(target, damageToApply, knockbackToApply);
     } else {
       this.showFeedback('FALLASTE', '#ec3131');
     }
