@@ -17,7 +17,13 @@ const PhaserGame = ({ scenes, onGameReady }) => {
       width: parentWidth,
       height: parentHeight,
       parent: parentRef.current,
-      backgroundColor: '#1a1a2e',
+      backgroundColor: 'transparent',
+      transparent: true,
+      render: {
+        antialias: true,
+        antialiasGL: true,
+        pixelArt: false
+      },
       scene: scenes,
       scale: {
         mode: Phaser.Scale.FIT,

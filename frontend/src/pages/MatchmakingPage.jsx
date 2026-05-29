@@ -23,7 +23,7 @@ function MatchmakingPage({ user }) {
     try {
       setStatus('searching');
       const result = await api.findMatch();
-      
+
       if (result.success) {
         if (result.data.status === 'QUEUED') {
           setTicketId(result.data.ticketId);
@@ -48,17 +48,16 @@ function MatchmakingPage({ user }) {
   const pollForMatch = async (ticketId) => {
     const pollInterval = setInterval(async () => {
       try {
-        // In a real app, you'd use WebSocket or long-polling
-        // For now, we'll simulate a match after a delay
-        setTimeout(() => {
+        const result = await api.findMatch(ticketId);
+        
+        if (result.success && result.data.status === 'MATCHED') {
           clearInterval(pollInterval);
           setStatus('matched');
-          const mockGameId = 'game_' + Date.now();
-          setGameId(mockGameId);
+          setGameId(result.data.gameId);
           setTimeout(() => {
-            navigate('/game', { state: { gameId: mockGameId, mode: 'pvp' } });
+            navigate('/game', { state: { gameId: result.data.gameId, mode: 'pvp' } });
           }, 1500);
-        }, 3000);
+        }
       } catch (err) {
         clearInterval(pollInterval);
         setStatus('error');

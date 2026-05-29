@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
+    "build:server": "tsc -p tsconfig.server.json",
+    "dev:server": "npm run build:server && node dist/index.js",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
@@ -19,21 +21,26 @@
     "@prisma/client": "6.4.1",
     "axios": "^1.16.1",
     "bcryptjs": "^2.4.3",
+    "cors": "^2.8.6",
+    "express": "^5.2.1",
     "jsonwebtoken": "^9.0.2",
     "next": "16.2.6",
     "react": "19.2.4",
     "react-dom": "19.2.4",
-    "socket.io": "^4.8.1",
+    "socket.io": "^4.8.3",
     "socket.io-client": "^4.8.1",
     "zod": "^3.24.2"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^2.4.6",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
     "@types/jsonwebtoken": "^9.0.9",
-    "@types/node": "^20",
+    "@types/node": "^20.19.41",
     "@types/react": "^19",
     "@types/react-dom": "^19",
+    "@types/socket.io": "^3.0.1",
     "eslint": "^9",
     "eslint-config-next": "16.2.6",
     "prisma": "^6.4.1",
@@ -50,5 +57,6 @@
       "prisma",
       "sharp"
     ]
-  }
+  },
+  "packageManager": "pnpm@11.4.0+sha512.f0febc7e37552ab485494a914241b338e0b3580b93d54ce31f00933015880863129038a1b4ae4e414a0ee63ac35bf21197e990172c4a68256450b5636310968f"
 }

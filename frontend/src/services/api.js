@@ -1,4 +1,5 @@
-const API_BASE_URL = 'http://localhost:3000/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+
 
 class ApiService {
   constructor() {
@@ -28,8 +29,9 @@ class ApiService {
   async register(username, email, password) {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/register`, {
+
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ username, email, password })
       });
       const data = await response.json();
@@ -45,8 +47,9 @@ class ApiService {
   async login(email, password) {
     try {
       const response = await fetch(`${API_BASE_URL}/auth/login`, {
+
         method: 'POST',
-        headers: this.getHeaders(),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password })
       });
       const data = await response.json();
@@ -75,12 +78,12 @@ class ApiService {
     }
   }
 
-  async findMatch() {
+  async findMatch(playerId) {
     try {
       const response = await fetch(`${API_BASE_URL}/matchmaking/find`, {
         method: 'POST',
         headers: this.getHeaders(),
-        body: JSON.stringify({})
+        body: JSON.stringify(playerId ? { id: playerId } : {})
       });
       const data = await response.json();
       if (data.success) {
